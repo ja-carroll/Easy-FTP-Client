@@ -3,9 +3,22 @@ package main
 import (
 	"log"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
+)
+
+type State int
+
+const (
+	connectionForm State = iota
+	connecting
+)
+
+var (
+	activeLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
 )
 
 type (
@@ -13,9 +26,11 @@ type (
 )
 
 type model struct {
+	state   State
 	inputs  []textinput.Model
 	focused int
 	err     error
+	spinner spinner.Model
 	form    *huh.Form // huh.Form is just a tea.Model
 }
 
@@ -40,6 +55,9 @@ func (m model) View() string {
 	//		"(esc to quit)",
 	//	) + "\n"
 
+	if m.state == connecting {
+		return "\n " + m.spinner.View() + "Connecting to host"
+	}
 	return m.form.View()
 }
 
@@ -101,7 +119,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.form.State == huh.StateCompleted {
-		cmds = append(cmds, tea.Quit)
+		m.state = connecting
+	}
+
+	switch m.state {
+	case connecting:
+		return m, tea.Batch(m.spinner.Tick)
 	}
 
 	return m, tea.Batch(cmds...)
@@ -143,11 +166,17 @@ func initialModel() model {
 		),
 	)
 
+	loadingSpinner := spinner.New()
+	loadingSpinner.Style = activeLabelStyle
+	loadingSpinner.Spinner = spinner.Dot
+
 	return model{
+		state:   connectionForm,
 		inputs:  inputs,
 		focused: 0,
 		err:     nil,
 		form:    form,
+		spinner: loadingSpinner,
 	}
 }
 func main() {
