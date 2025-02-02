@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -20,6 +21,8 @@ const (
 var (
 	activeLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
 )
+
+type connectionAchievedMsg struct{}
 
 type (
 	errMsg error
@@ -111,20 +114,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmds []tea.Cmd
-
-	form, cmd := m.form.Update(msg)
-	if f, ok := form.(*huh.Form); ok {
-		m.form = f
-		cmds = append(cmds, cmd)
-	}
-
-	if m.form.State == huh.StateCompleted {
-		m.state = connecting
-	}
+	var cmd tea.Cmd
 
 	switch m.state {
+	case connectionForm:
+		form, cmd := m.form.Update(msg)
+		if f, ok := form.(*huh.Form); ok {
+			m.form = f
+			cmds = append(cmds, cmd)
+		}
+		if m.form.State == huh.StateCompleted {
+			m.state = connecting
+			return m, tea.Batch(m.spinner.Tick, m.MakeConnection())
+		}
 	case connecting:
-		return m, tea.Batch(m.spinner.Tick)
+		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
 	}
 
 	return m, tea.Batch(cmds...)
@@ -183,5 +188,12 @@ func main() {
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func (m model) MakeConnection() tea.Cmd {
+	return func() tea.Msg {
+		time.After(5 * time.Second)
+		return connectionAchievedMsg{}
 	}
 }
