@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,15 +20,19 @@ const (
 	connectionForm State = iota
 	connecting
 	welcoming
+	uploadButtonActive
+	downloadButtonActive
 )
 
 var (
+	accentColor         = lipgloss.Color("99")
+	yellowColor         = lipgloss.Color("#ECFD66")
 	activeLabelStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
-	uploadButtonStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("FFF7DB")).Background(lipgloss.Color("F25D94")).Padding(0, 3).MarginTop(1).MarginRight(2).Underline(true)
-	downloadButtonStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("FFF7DB")).Background(lipgloss.Color("F25D94")).Padding(0, 3).MarginTop(1)
+	uploadButtonStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFF7DB")).Background(lipgloss.Color("#F25D94")).Padding(0, 3).MarginTop(1).MarginRight(2).Underline(true)
+	downloadButtonStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFF7DB")).Background(lipgloss.Color("#F25D94")).Padding(0, 3).MarginTop(1)
 
 	// dialog
-	dialogBoxStyle = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(lipgloss.Color("874BFD")).Padding(1, 0).BorderTop(true).BorderBottom(true).BorderLeft(true).BorderRight(true)
+	dialogBoxStyle = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(lipgloss.Color("#874BFD")).Padding(1, 0).BorderTop(true).BorderBottom(true).BorderLeft(true).BorderRight(true)
 	// This is essentially the container page
 	docStyle = lipgloss.NewStyle().Padding(1, 2, 1, 2)
 )
@@ -57,12 +62,20 @@ func (m model) View() string {
 
 	if m.state == connecting {
 		return "\n " + m.spinner.View() + "Connecting to host"
-	} else if m.state == welcoming {
-		uploadButton := uploadButtonStyle.Render("Upload")
-		downloadButton := downloadButtonStyle.Render("Download")
+	} else if m.state == welcoming || m.state == downloadButtonActive || m.state == uploadButtonActive {
+		uploadButton := uploadButtonStyle
+		downloadButton := downloadButtonStyle
+
+		if m.state == uploadButtonActive {
+			uploadButton = uploadButtonStyle.Background(accentColor).Foreground(yellowColor)
+		}
+
+		if m.state == downloadButtonActive {
+			downloadButton = downloadButtonStyle.Background(accentColor).Foreground(yellowColor)
+		}
 
 		bannerMsg := lipgloss.NewStyle().Width(50).Align(lipgloss.Center).Render("Easy-FTP-Client")
-		buttons := lipgloss.JoinHorizontal(lipgloss.Top, uploadButton, downloadButton)
+		buttons := lipgloss.JoinHorizontal(lipgloss.Top, uploadButton.Render("Upload"), downloadButton.Render("Download"))
 		ui := lipgloss.JoinVertical(lipgloss.Center, bannerMsg, buttons)
 
 		dialog := lipgloss.Place(100, 10, lipgloss.Center, lipgloss.Center, dialogBoxStyle.Render(ui))
@@ -81,11 +94,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = welcoming
 		return m, displayWelcomeScreen()
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c":
+		switch {
+		case key.Matches(msg, key.NewBinding(key.WithKeys("ctrl+c", "esc", "q"))):
 			return m, tea.Quit
-		case "esc", "q":
-			return m, tea.Quit
+		case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
+			switch m.state {
+			case welcoming:
+				m.state = uploadButtonActive
+			case uploadButtonActive:
+				m.state = downloadButtonActive
+			}
+		case key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab"))):
+			switch m.state {
+			case downloadButtonActive:
+				m.state = uploadButtonActive
+			}
 		}
 	}
 
