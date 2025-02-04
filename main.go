@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -9,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 )
 
 type State int
@@ -16,12 +18,21 @@ type State int
 const (
 	connectionForm State = iota
 	connecting
+	welcoming
 )
 
 var (
-	activeLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
+	activeLabelStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("99"))
+	uploadButtonStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("FFF7DB")).Background(lipgloss.Color("F25D94")).Padding(0, 3).MarginTop(1).MarginRight(2).Underline(true)
+	downloadButtonStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("FFF7DB")).Background(lipgloss.Color("F25D94")).Padding(0, 3).MarginTop(1)
+
+	// dialog
+	dialogBoxStyle = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).BorderForeground(lipgloss.Color("874BFD")).Padding(1, 0).BorderTop(true).BorderBottom(true).BorderLeft(true).BorderRight(true)
+	// This is essentially the container page
+	docStyle = lipgloss.NewStyle().Padding(1, 2, 1, 2)
 )
 
+type welcomeScreenMsg struct{}
 type connectionAchievedMsg struct{}
 
 type (
@@ -42,68 +53,33 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m model) View() string {
-	// return fmt.Sprintf(
-	//		`
-	//    Welcome to Easy-ftp Client!
-	//    Please enter the Hostname of the ftp server you wish to connect to
-	//
-	//    %s
-	//    %s
-	//    %s
-	//
-	//    %s`,
-	//		m.inputs[0].View(),
-	//		m.inputs[1].View(),
-	//		m.inputs[2].View(),
-	//		"(esc to quit)",
-	//	) + "\n"
+	physicalWidth, _, _ := term.GetSize(int(os.Stdout.Fd()))
 
 	if m.state == connecting {
 		return "\n " + m.spinner.View() + "Connecting to host"
+	} else if m.state == welcoming {
+		uploadButton := uploadButtonStyle.Render("Upload")
+		downloadButton := downloadButtonStyle.Render("Download")
+
+		bannerMsg := lipgloss.NewStyle().Width(50).Align(lipgloss.Center).Render("Easy-FTP-Client")
+		buttons := lipgloss.JoinHorizontal(lipgloss.Top, uploadButton, downloadButton)
+		ui := lipgloss.JoinVertical(lipgloss.Center, bannerMsg, buttons)
+
+		dialog := lipgloss.Place(100, 10, lipgloss.Center, lipgloss.Center, dialogBoxStyle.Render(ui))
+		if physicalWidth > 0 {
+			docStyle = docStyle.MaxWidth(physicalWidth)
+		}
+
+		return docStyle.Render(dialog)
 	}
 	return m.form.View()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	//	var cmds []tea.Cmd = make([]tea.Cmd, len(m.inputs))
-	//
-	//	switch msg := msg.(type) {
-	//	case tea.KeyMsg:
-	//		switch msg.Type {
-	//
-	//		case tea.KeyEnter:
-	//			if m.focused == len(m.inputs)-1 {
-	//				return m, tea.Quit
-	//			}
-	//			// Increment to the next input if we are not at the last input
-	//			m.nextInput()
-	//
-	//		case tea.KeyCtrlC, tea.KeyEsc:
-	//			return m, tea.Quit
-	//
-	//		case tea.KeyDown:
-	//			m.nextInput()
-	//		case tea.KeyUp:
-	//			m.prevInput()
-	//		}
-	//
-	//		for i := range m.inputs {
-	//			m.inputs[i].Blur()
-	//		}
-	//		m.inputs[m.focused].Focus()
-	//
-	//	case errMsg:
-	//		m.err = msg
-	//		return m, nil
-	//	}
-	//
-	//	for i := range m.inputs {
-	//		m.inputs[i], cmds[i] = m.inputs[i].Update(msg)
-	//	}
-	//
-	//	return m, tea.Batch(cmds...)
-
 	switch msg := msg.(type) {
+	case connectionAchievedMsg:
+		m.state = welcoming
+		return m, displayWelcomeScreen()
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
@@ -133,6 +109,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func displayWelcomeScreen() tea.Cmd {
+	return func() tea.Msg {
+		return welcomeScreenMsg{}
+	}
 }
 
 func (m *model) nextInput() {
@@ -184,6 +166,7 @@ func initialModel() model {
 		spinner: loadingSpinner,
 	}
 }
+
 func main() {
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
