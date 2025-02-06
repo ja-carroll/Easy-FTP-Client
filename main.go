@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/charmbracelet/bubbles/filepicker"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -22,6 +23,7 @@ const (
 	welcoming
 	uploadButtonActive
 	downloadButtonActive
+	choosingFileToUpload
 )
 
 var (
@@ -45,12 +47,13 @@ type (
 )
 
 type model struct {
-	state   State
-	inputs  []textinput.Model
-	focused int
-	err     error
-	spinner spinner.Model
-	form    *huh.Form // huh.Form is just a tea.Model
+	state            State
+	inputs           []textinput.Model
+	focused          int
+	err              error
+	spinner          spinner.Model
+	form             *huh.Form // huh.Form is just a tea.Model
+	uploadFilePicker filepicker.Model
 }
 
 func (m model) Init() tea.Cmd {
@@ -180,13 +183,17 @@ func initialModel() model {
 	loadingSpinner.Style = activeLabelStyle
 	loadingSpinner.Spinner = spinner.Dot
 
+	picker := filepicker.New()
+	picker.CurrentDirectory, _ = os.UserHomeDir()
+
 	return model{
-		state:   connectionForm,
-		inputs:  inputs,
-		focused: 0,
-		err:     nil,
-		form:    form,
-		spinner: loadingSpinner,
+		state:            connectionForm,
+		inputs:           inputs,
+		focused:          0,
+		err:              nil,
+		form:             form,
+		spinner:          loadingSpinner,
+		uploadFilePicker: picker,
 	}
 }
 
