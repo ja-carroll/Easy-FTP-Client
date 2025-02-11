@@ -87,6 +87,8 @@ func (m model) View() string {
 		}
 
 		return docStyle.Render(dialog)
+	} else if m.state == choosingFileToUpload {
+		return "\n" + m.uploadFilePicker.View()
 	}
 	return m.form.View()
 }
@@ -112,6 +114,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case downloadButtonActive:
 				m.state = uploadButtonActive
 			}
+		case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
+			switch m.state {
+			case uploadButtonActive:
+				m.state = choosingFileToUpload
+				return m, m.uploadFilePicker.Init()
+			}
 		}
 	}
 
@@ -131,6 +139,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case connecting:
 		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
+	case choosingFileToUpload:
+		m.uploadFilePicker, cmd = m.uploadFilePicker.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -184,7 +195,6 @@ func initialModel() model {
 	loadingSpinner.Spinner = spinner.Dot
 
 	picker := filepicker.New()
-	picker.CurrentDirectory, _ = os.UserHomeDir()
 
 	return model{
 		state:            connectionForm,
