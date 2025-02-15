@@ -88,7 +88,8 @@ func (m model) View() string {
 
 		return docStyle.Render(dialog)
 	} else if m.state == choosingFileToUpload {
-		return "\n" + m.uploadFilePicker.View()
+		pickerStyle := lipgloss.NewStyle().Width(50)
+		return "\n\n" + pickerStyle.Render(m.uploadFilePicker.View()) + "\n"
 	}
 	return m.form.View()
 }
@@ -98,6 +99,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case connectionAchievedMsg:
 		m.state = welcoming
 		return m, displayWelcomeScreen()
+	case tea.WindowSizeMsg:
+		m.uploadFilePicker.Height = msg.Height / 4
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, key.NewBinding(key.WithKeys("ctrl+c", "esc", "q"))):
